@@ -1,0 +1,23 @@
+# specific to CodeBlocks IDE
+
+*.layout
+*.depend
+*.cbp
+
+# generated directories
+
+bin/
+obj/
+
+# any images generated
+
+*.jpg
+*.png
+*.exr
+
+# Volume Data Files
+
+*.raw
+*.inf
+*.raw.inf
+*.pvm
