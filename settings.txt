@@ -1,0 +1,31 @@
+#Settings file for Volume Renderer. The order of the options isn't necessary. If PVM file is given nothing else is needed.
+#However if ".raw" file is provided, the user will have to provide the dimensions and the aspect-ratio as well.
+#Empty options should be skipped along with the headers (pvm, raw, dimensions, aspect-ratio). If a header is provided and the 
+#option is empty the program will throw an error. "#" is used for comments. An example is given below
+
+#################################
+# pvm
+# abc.pvm
+#
+# raw
+# abc.raw
+#
+# dimensions
+# x y z
+#
+# aspect-ratio
+# x y z
+#
+###################################
+
+#pvm
+#Lobster.pvm
+
+raw
+Foot.raw
+
+dimensions
+256 256 256
+
+aspect-ratio
+1 1 1
