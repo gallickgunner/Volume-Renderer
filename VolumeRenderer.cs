@@ -18,6 +18,7 @@ struct AABB
 
 const float view_plane_dist = 1.733;
 const float EPSILON = 0.00001f;
+const float GAMMA = 2.2;
 const float z_offset = -2.0;
 float x_hlen, y_hlen;
 AABB bb = AABB(vec4(0,0,0,1), vec4(1,1,1,1));
@@ -62,7 +63,8 @@ void main()
     
     if(intersectRayAABB(eye_ray, bb, t_min, t_max))
     {
-        vec4 color = rayMarchVolume(eye_ray, t_min, t_max);        
+        vec4 color = rayMarchVolume(eye_ray, t_min, t_max);   
+        color.rgb = pow(color.rgb, vec3(1.0/GAMMA));
         imageStore(render_texture, pix, color);
     }
     else
@@ -103,6 +105,22 @@ vec4 rayMarchVolume(Ray eye_ray, float t_min, float t_max)
         }        
         pos += eye_ray.dir * step_size;
     }
+    
+    //MIP (maximum intensity projection)
+    /*for(int i = 0; i < 10000; i++)
+    {
+        vec3 tex_coord = cartesianToTextureCoord(pos);        
+        if(all(greaterThan(tex_coord, vec3(1.0))))
+            break;        
+        src = vec4(texture(vol_tex3D, tex_coord).r);
+        if(dest.r < src.r)
+        {
+            dest = src;                    
+        }
+        pos += eye_ray.dir * step_size;
+        if(all(greaterThan(pos, end_point)))
+            break;
+    }*/
     return dest;
 }
 
