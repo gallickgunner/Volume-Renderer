@@ -1,5 +1,5 @@
 /******************************************************************************
- *  Copyright (C) 2018 by Umair Ahmed.
+ *  Copyright (C) 2019 by Umair Ahmed.
  *
  *  This is a free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -23,7 +23,9 @@
 #include "GLroutines.h"
 #include "pvm2raw.h"
 
-VolumeRenderer::VolumeRenderer()
+#include <functional>
+
+VolumeRenderer::VolumeRenderer() : main_cam(30)
 {
     voxel_size = glm::vec3(1.0f, 1.0f, 1.0f);
     //ctor
@@ -37,8 +39,14 @@ VolumeRenderer::~VolumeRenderer()
 void VolumeRenderer::setup()
 {
     glfw_manager.createWindow(640, 480, "Volume Renderer");
+    glfw_manager.setCameraUpdateCallback(std::bind(&(main_cam.setOrientation), &main_cam,
+                                         std::placeholders::_1,
+                                         std::placeholders::_2,
+                                         std::placeholders::_3)
+                                        );
     readVolumeData();
     setupFBO();
+    setupUBO();
     createShader(cs_ID, "VolumeRenderer.cs", GL_COMPUTE_SHADER);
     createShaderProgram(cs_programID, cs_ID);
 
@@ -72,6 +80,10 @@ void VolumeRenderer::start()
 
     while(!glfwWindowShouldClose(glfw_manager.window))
     {
+        if(main_cam.is_changed)
+        {
+            setupUBO(true);
+        }
         glBindImageTexture(0, fbo_texID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
         glBeginQuery(GL_TIME_ELAPSED, query);
@@ -130,6 +142,23 @@ void VolumeRenderer::setupFBO()
     }
 }
 
+void VolumeRenderer::setupUBO(bool is_update)
+{
+    std::vector<float> cam_data;
+    cam_data.clear();
+    main_cam.setUBO(cam_data);
+
+    if(!is_update)
+        glGenBuffers(1, &camera_ubo_ID);
+
+    glBindBuffer(GL_UNIFORM_BUFFER, camera_ubo_ID);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(float)*cam_data.size(), cam_data.data(), GL_DYNAMIC_DRAW);
+
+    if(!is_update)
+        glBindBufferBase(GL_UNIFORM_BUFFER, 1, camera_ubo_ID);
+
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+}
 void VolumeRenderer::readVolumeData()
 {
     std::string fn = "settings.txt", line = "", pvm_fn, raw_fn;
@@ -219,6 +248,24 @@ void VolumeRenderer::readVolumeData()
     //Read RAW file into byte array;
     GLubyte* volume_data = new GLubyte[len];
     raw_file.read((char*)volume_data, len);
+
+    //Clear first and last slices to 0 so we don't get garbage values
+    int length = tex3D_dim.x * tex3D_dim.y;
+    int start = (tex3D_dim.x * tex3D_dim.y) * (tex3D_dim.z - 1);
+
+    for(int i = 0; i < length; i++)
+        volume_data[i] = 0;
+
+    length *= tex3D_dim.z;
+    for(int i = start; i < length; i++)
+        volume_data[i] = 0;
+
+
+    /*int start = (tex3D_dim.x * tex3D_dim.y) * (tex3D_dim.z - 230);
+    for(int i = start; i < len; i++)
+    {
+        volume_data[i] = 0;
+    }*/
 
     //Upload data from array to 3D texture
     glGenTextures(1, &vol_tex3D);

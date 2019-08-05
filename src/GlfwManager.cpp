@@ -1,5 +1,5 @@
 /******************************************************************************
- *  Copyright (C) 2018 by Umair Ahmed.
+ *  Copyright (C) 2019 by Umair Ahmed.
  *
  *  This is a free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -21,12 +21,15 @@
 
 #include <iostream>
 
+std::function<void(float, float, float)> GlfwManager::cameraUpdateCallback;
+
 GlfwManager::GlfwManager()
 {
     glfwSetErrorCallback(errorCallback);
     if(!glfwInit())
         throw RuntimeError("GLFW failed to initialize.");
     window = NULL;
+    mouse_button_pressed = false;
     //ctor
 }
 
@@ -100,6 +103,7 @@ void GlfwManager::createWindow(int window_width, int window_height, std::string 
     glfwSetMouseButtonCallback(window, mouseButtonCallback);
     glfwSetCursorPosCallback(window, cursorPosCallback);
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
+    glfwSetScrollCallback(window, mouseScrollCallback);
 
     glfwGetFramebufferSize(window, &framebuffer_width, &framebuffer_height);
     glViewport(0,0, framebuffer_width, framebuffer_height);
@@ -118,6 +122,10 @@ void GlfwManager::focusWindow()
     glfwFocusWindow(window);
 }
 
+void GlfwManager::setCameraUpdateCallback(std::function<void(float, float, float)> cb)
+{
+    GlfwManager::cameraUpdateCallback = cb;
+}
 
 void GlfwManager::errorCallback(int error, const char* msg)
 {
@@ -136,24 +144,26 @@ void GlfwManager::keyCallback(GLFWwindow* window, int key, int scancode, int act
 void GlfwManager::cursorPosCallback(GLFWwindow* window, double new_cursor_x, double new_cursor_y)
 {
     GlfwManager* ptr = (GlfwManager*) glfwGetWindowUserPointer(window);
-    /*if(ptr->space_flag)
+    if(ptr->mouse_button_pressed)
     {
         float delta_x, delta_y;
-        float x_rad = 0.06, y_rad = 0.06;
+        float zenith = 0.06, azimuth = 0.06;
 
         delta_x = new_cursor_x - ptr->old_cursor_x;
         delta_y = new_cursor_y - ptr->old_cursor_y;
 
         if(delta_x < 1 && delta_x > -1)
-            y_rad = 0;
+            azimuth = 0;
         else if (delta_x > 0)
-            y_rad *= -1.0;
+            azimuth *= -1.0;
 
         if(delta_y < 1 && delta_y > -1)
-            x_rad = 0;
+            zenith = 0;
         else if(delta_y > 0)
-            x_rad *= -1.0;
-        cameraUpdateCallback(Vec4f(0,0,0,0), x_rad, y_rad);
+            zenith *= -1.0;
+
+        GlfwManager::cameraUpdateCallback(0, zenith, azimuth);
+
         ptr->old_cursor_x = new_cursor_x;
         ptr->old_cursor_y = new_cursor_y;
     }
@@ -162,10 +172,23 @@ void GlfwManager::cursorPosCallback(GLFWwindow* window, double new_cursor_x, dou
         ptr->old_cursor_x = new_cursor_x;
         ptr->old_cursor_y = new_cursor_y;
     }
-    gui->screen->cursorPosCallbackEvent(new_cursor_x, new_cursor_y);*/
 
 }
 
 void GlfwManager::mouseButtonCallback(GLFWwindow* window, int button, int action, int modifiers)
 {
+    GlfwManager* ptr = (GlfwManager*) glfwGetWindowUserPointer(window);
+    if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+    {
+        ptr->mouse_button_pressed = true;
+    }
+    else if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
+    {
+        ptr->mouse_button_pressed = false;
+    }
+}
+
+void GlfwManager::mouseScrollCallback(GLFWwindow* window, double x_offset, double y_offset)
+{
+    cameraUpdateCallback(y_offset, 0, 0);
 }

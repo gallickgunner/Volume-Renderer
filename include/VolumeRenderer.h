@@ -1,5 +1,5 @@
 /******************************************************************************
- *  Copyright (C) 2018 by Umair Ahmed.
+ *  Copyright (C) 2019 by Umair Ahmed.
  *
  *  This is a free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 
 #include "GlfwManager.h"
 #include "glm/vec3.hpp"
+#include "Camera.h"
 
 class VolumeRenderer
 {
@@ -32,11 +33,12 @@ class VolumeRenderer
 
     private:
         void setupFBO();
+        void setupUBO(bool is_update = false);
         void readVolumeData();
 
         GlfwManager glfw_manager;
-        GLuint vol_tex3D, fbo_ID, fbo_texID, cs_ID, cs_programID;
-
+        Camera main_cam;
+        GLuint vol_tex3D, camera_ubo_ID, fbo_ID, fbo_texID, cs_ID, cs_programID;
         glm::vec3 voxel_size;
 
 };

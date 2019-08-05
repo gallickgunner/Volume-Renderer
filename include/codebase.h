@@ -224,7 +224,36 @@ inline double getclockticks()
 
 #ifdef WINOS
 
+#ifndef _strdup
+inline char* strdup(const char *str)
+   {
+   char *strcpy;
+
+   if (str==NULL) return(NULL);
+   if ((strcpy=(char *)malloc(strlen(str)+1))==NULL) MEMERROR();
+
+   memcpy(strcpy,str,strlen(str)+1);
+   return(strcpy);
+   }
+#else
 #define strdup _strdup
+#endif // _strdup
+
+#ifndef strcasecmp
+inline int strcasecmp(const char *str1, const char* str2)
+   {
+   int c1, c2;
+   do
+    {
+        c1 = (unsigned char) *str1++;
+        c2 = (unsigned char) *str2++;
+        c1 = tolower(c1);
+        c2 = tolower(c2);
+    }while(c1 != '\0' && c1 == c2);
+    return (c1-c2);
+   }
+#endif // strcasecmp
+
 #define snprintf _snprintf
 
 #ifndef __MINGW32__

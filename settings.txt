@@ -18,11 +18,11 @@
 #
 ###################################
 
-#pvm
-#Lobster.pvm
+pvm
+Lobster.pvm
 
-raw
-Foot.raw
+#raw
+#Foot.raw
 
 dimensions
 256 256 256

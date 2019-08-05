@@ -17,13 +17,23 @@ struct AABB
 };
 
 const float view_plane_dist = 1.733;
-const float EPSILON = 0.00001f;
+const float EPSILON = 0.000001f;
 const float GAMMA = 2.2;
-const float z_offset = -2.0;
-float x_hlen, y_hlen;
+float x_hlen, y_hlen, z_hlen;
+
 AABB bb = AABB(vec4(0,0,0,1), vec4(1,1,1,1));
 vec4 step_size;
 ivec3 vol_size;
+
+layout(binding = 1, std140) uniform Camera     //    16
+{
+    mat4 view_mat;                             //    16                 0   (c1)
+                                               //    16                 16  (c2)
+                                               //    16                 32  (c3)
+                                               //    16                 48  (c4)
+    vec4 eye;                                  //    16                 64
+    float view_plane_dist;                     //    4                  80
+} main_cam;
 
 layout(location = 0) uniform vec3 voxel_size;
 layout(binding = 0, rgba32f) uniform image2D render_texture;
@@ -48,65 +58,65 @@ void main()
     bb.p_max *= vec4(voxel_size,1.0);
     x_hlen = bb.p_max.x/2.0f;
     y_hlen = bb.p_max.y/2.0f;
-    
+    z_hlen = bb.p_max.y/2.0f;
+	
     bb.p_min.x -= x_hlen;
     bb.p_max.x -= x_hlen;
     
     bb.p_min.y -= y_hlen;
     bb.p_max.y -= y_hlen;
     
-    bb.p_min.z += z_offset;
-    bb.p_max.z += z_offset;
+    bb.p_min.z -= z_hlen;
+    bb.p_max.z -= z_hlen;
     
     computeRay(pix.x + 0.5, pix.y + 0.5, img_size.x, img_size.y, eye_ray);
     float t_max, t_min;
     
     if(intersectRayAABB(eye_ray, bb, t_min, t_max))
     {
-        vec4 color = rayMarchVolume(eye_ray, t_min, t_max);   
-        color.rgb = pow(color.rgb, vec3(1.0/GAMMA));
+        vec4 color = rayMarchVolume(eye_ray, t_min, t_max);  
+        //color.rgb = pow(color.rgb, vec3(1.0/GAMMA));
+        //color.rgb = vec3(t_max - t_min);
         imageStore(render_texture, pix, color);
     }
     else
     {
-        imageStore(render_texture, pix, vec4(0.0f));
+        imageStore(render_texture, pix, vec4(0.4f));
     }
 }
 
 vec4 rayMarchVolume(Ray eye_ray, float t_min, float t_max)
 {    
-    step_size = 1 / ( vec4(vol_size,1.0) * vec4(voxel_size, 1.0) );
+    step_size = vec4(voxel_size, 1.0)  /  vec4(vol_size,1.0);    
+	//step_size = 1 / vec4(vol_size, 1.0);	
     vec4 start_point = eye_ray.origin + (eye_ray.dir * t_min);
-    vec4 end_point = eye_ray.origin + (eye_ray.dir * t_max);
+    vec4 end_point = eye_ray.origin + (eye_ray.dir * t_max);        
     
     vec4 dest = vec4(0.0);
-    vec4 src = vec4(0.0);
-    vec4 pos = start_point + eye_ray.dir * EPSILON;
-    
-    float alpha_scale = 0.02;
-    vec3 grey = vec3(0.3, 0.3, 0.3);
-    
+    vec4 src = vec4(0.0);    
+    vec4 pos = start_point + eye_ray.dir * EPSILON;    
+	
+    float alpha_scale = 0.1;	
+    vec3 grey = vec3(0.1, 0.1, 0.1);
+	
     for(int i = 0; i < 10000; i++)
     {
         vec3 tex_coord = cartesianToTextureCoord(pos);        
-        if(all(greaterThan(tex_coord, vec3(1.0))) || dest.a >= 0.95)
+        if( any(greaterThan(tex_coord, vec3(1.0))) || any(lessThan(tex_coord, vec3(0.0))) || dest.a >= 0.95)
             break;
         
-        /* The data from the raw file is in the Red channel. Since it's only a single value we map it to all channels.
-         * Alternatively I can also use a constant value for the grey color channel
-         */
         src = vec4(texture(vol_tex3D, tex_coord).r);
         if(src.a > 1/255.0)
         {
             //src.rgb = grey;
-            src.a *= alpha_scale;
+            src.a *= alpha_scale;            
             src *= src.a;
             dest += src * (1 - dest.a);
         }        
-        pos += eye_ray.dir * step_size;
+        pos += eye_ray.dir * step_size;		
     }
     
-    //MIP (maximum intensity projection)
+    //MIP
     /*for(int i = 0; i < 10000; i++)
     {
         vec3 tex_coord = cartesianToTextureCoord(pos);        
@@ -121,6 +131,7 @@ vec4 rayMarchVolume(Ray eye_ray, float t_min, float t_max)
         if(all(greaterThan(pos, end_point)))
             break;
     }*/
+    
     return dest;
 }
 
@@ -129,12 +140,13 @@ vec3 cartesianToTextureCoord(vec4 point)
     //Since the BB was aligned in the center we need to remap the coordinates back in 0-1 range
     point.x += x_hlen;
     point.y += y_hlen;
-    point.z -= z_offset;
+    point.z += z_hlen;
     
     /* Since (1,1,1) is actually the front side, we need to inverse it so we dont sample from the back
      * when at the start of the bounding box
      */
-    point.z = 1 - point.z;
+    point.z = voxel_size.z - point.z;
+	//point.z = 1 - point.z;
     return point.xyz/voxel_size;
 }
 
@@ -142,20 +154,23 @@ void computeRay(float pixel_x, float pixel_y, int img_width, int img_height, out
 {
     float x, y, z, aspect_ratio;
     aspect_ratio = (img_width*1.0)/img_height;
-
-    x = aspect_ratio *((2.0 * pixel_x/img_width) - 1);
+	
+	x = aspect_ratio *((2.0 * pixel_x/img_width) - 1);
     y = (2.0 * pixel_y/img_height) -1 ;
-    z = -view_plane_dist;	
-
+    z = -main_cam.view_plane_dist;		
+	
+	//Orthographic Projection
+	/*
+	eye_ray.dir = -main_cam.view_mat[2];
+	eye_ray.origin = vec4(x,y,z,0);
+	eye_ray.origin = main_cam.view_mat * vec4(eye_ray.origin);
+	eye_ray.origin.w = 1;	
+	eye_ray.length = 99999999.9;*/
+	
     eye_ray.dir = normalize(vec4(x,y,z,0));
-    eye_ray.origin = vec4(0,0,0,1);
-    eye_ray.length = 99999999.9;
-    eye_ray.is_shadow_ray = false;
-    
-    /*eye_ray.dir = normalize((main_cam.view_mat * vec4(eye_ray.dir)));
+    eye_ray.dir = normalize((main_cam.view_mat * vec4(eye_ray.dir)));
     eye_ray.origin = main_cam.eye;
     eye_ray.length = 99999999.9;
-    eye_ray.is_shadow_ray = false;*/
 }
 
 bool intersectRayAABB(Ray ray, AABB bb, out float t_min, out float t_max)
