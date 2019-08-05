@@ -58,7 +58,7 @@ void main()
     bb.p_max *= vec4(voxel_size,1.0);
     x_hlen = bb.p_max.x/2.0f;
     y_hlen = bb.p_max.y/2.0f;
-    z_hlen = bb.p_max.y/2.0f;
+    z_hlen = bb.p_max.z/2.0f;
 	
     bb.p_min.x -= x_hlen;
     bb.p_max.x -= x_hlen;
@@ -96,8 +96,8 @@ vec4 rayMarchVolume(Ray eye_ray, float t_min, float t_max)
     vec4 src = vec4(0.0);    
     vec4 pos = start_point + eye_ray.dir * EPSILON;    
 	
-    float alpha_scale = 0.1;	
-    vec3 grey = vec3(0.1, 0.1, 0.1);
+    float alpha_scale = 1;	
+    vec3 grey = vec3(0.3, 0.3, 0.3);
 	
     for(int i = 0; i < 10000; i++)
     {
@@ -108,7 +108,7 @@ vec4 rayMarchVolume(Ray eye_ray, float t_min, float t_max)
         src = vec4(texture(vol_tex3D, tex_coord).r);
         if(src.a > 1/255.0)
         {
-            //src.rgb = grey;
+            src.rgb = grey;
             src.a *= alpha_scale;            
             src *= src.a;
             dest += src * (1 - dest.a);
