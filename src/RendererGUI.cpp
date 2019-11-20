@@ -48,6 +48,7 @@ void RendererGUI::run()
     int frame_count = 0;
     double prev_time = glfwGetTime(), prev_frame_time = 0, skip_ticks = 16.66666;
 
+    volren.loadShader("VolumeRenderer.cs", false);
     while(!glfwWindowShouldClose(glfw_manager.window))
     {
         //Show ms per frame and per kernel averaged over 1 sec intervals...

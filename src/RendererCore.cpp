@@ -458,7 +458,10 @@ bool RendererCore::createShader(std::string fn, bool reload)
     file.open(fn, std::ios::binary);
     if(!file.is_open())
     {
-        msg = "Failed to Open Shader file.";
+        if(fn == "VolumeRenderer.cs")
+            msg = "Failed to open default Shader file. Please select a shader file with the extension \".cs\" explicitly.";
+        else
+            msg = "Failed to open Shader file.";
         title = "Error!";
         return false;
     }
