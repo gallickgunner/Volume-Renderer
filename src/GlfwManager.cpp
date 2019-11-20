@@ -1,40 +1,32 @@
-/******************************************************************************
- *  Copyright (C) 2019 by Umair Ahmed.
- *
- *  This is a free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  This software is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- ******************************************************************************/
-
-#include "GlfwManager.h"
-#include "RuntimeError.h"
-
 #include <iostream>
+#include <exception>
+#include "GlfwManager.h"
+#include "imgui.h"
+#include "imgui_internal.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 
 std::function<void(float, float, float)> GlfwManager::cameraUpdateCallback;
 
-GlfwManager::GlfwManager()
+GlfwManager::GlfwManager(int window_width, int window_height, std::string title, bool is_fullscreen)
 {
     glfwSetErrorCallback(errorCallback);
     if(!glfwInit())
-        throw RuntimeError("GLFW failed to initialize.");
+        throw std::runtime_error("GLFW failed to initialize.");
+
     window = NULL;
     mouse_button_pressed = false;
+    createWindow(window_width, window_height, title, is_fullscreen);
+    initImGui();
     //ctor
 }
 
 GlfwManager::~GlfwManager()
 {
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
     if(window)
             glfwDestroyWindow(window);
         glfwTerminate();
@@ -87,14 +79,14 @@ void GlfwManager::createWindow(int window_width, int window_height, std::string 
     if(!window)
     {
         glfwTerminate();
-        throw RuntimeError("Window creation failed..");
+        throw std::runtime_error("Window creation failed..");
     }
 
     glfwMakeContextCurrent(window);
     if( !gladLoadGLLoader( (GLADloadproc) glfwGetProcAddress) )
-        throw RuntimeError("Couldn't Initialize GLAD..");
+        throw std::runtime_error("Couldn't Initialize GLAD..");
     if(!GLAD_GL_VERSION_4_3)
-        throw RuntimeError("OpenGL version 4.3 not supported");
+        throw std::runtime_error("OpenGL version 4.3 not supported");
 
     glGetError();
     glfwSetWindowUserPointer(window, this);
@@ -113,7 +105,23 @@ void GlfwManager::createWindow(int window_width, int window_height, std::string 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glfwSwapBuffers(window);
     glfwPollEvents();
-    glGetError();
+}
+
+void GlfwManager::initImGui()
+{
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+     // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+    //ImGui::StyleColorsClassic();
+
+    // Setup Platform/Renderer bindings
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 430");
 }
 
 void GlfwManager::focusWindow()
@@ -138,11 +146,17 @@ void GlfwManager::framebufferSizeCallback(GLFWwindow* window, int width, int hei
 
 void GlfwManager::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
+    ImGuiIO& io = ImGui::GetIO();
+    if(io.WantCaptureKeyboard)
+        return;
     GlfwManager* ptr = (GlfwManager*) glfwGetWindowUserPointer(window);
 }
 
 void GlfwManager::cursorPosCallback(GLFWwindow* window, double new_cursor_x, double new_cursor_y)
 {
+    ImGuiIO& io = ImGui::GetIO();
+    if(io.WantCaptureMouse)
+        return;
     GlfwManager* ptr = (GlfwManager*) glfwGetWindowUserPointer(window);
     if(ptr->mouse_button_pressed)
     {
@@ -177,6 +191,9 @@ void GlfwManager::cursorPosCallback(GLFWwindow* window, double new_cursor_x, dou
 
 void GlfwManager::mouseButtonCallback(GLFWwindow* window, int button, int action, int modifiers)
 {
+    ImGuiIO& io = ImGui::GetIO();
+    if(io.WantCaptureMouse)
+        return;
     GlfwManager* ptr = (GlfwManager*) glfwGetWindowUserPointer(window);
     if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
     {
@@ -190,5 +207,8 @@ void GlfwManager::mouseButtonCallback(GLFWwindow* window, int button, int action
 
 void GlfwManager::mouseScrollCallback(GLFWwindow* window, double x_offset, double y_offset)
 {
+    ImGuiIO& io = ImGui::GetIO();
+    if(io.WantCaptureMouse)
+        return;
     cameraUpdateCallback(y_offset, 0, 0);
 }

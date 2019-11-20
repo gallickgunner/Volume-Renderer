@@ -19,11 +19,11 @@ struct AABB
 const float view_plane_dist = 1.733;
 const float EPSILON = 0.000001f;
 const float GAMMA = 2.2;
-float x_hlen, y_hlen, z_hlen;
+float x_ratio = 1.0, y_ratio = 1.0, z_ratio = 1.0;
 
 AABB bb = AABB(vec4(0,0,0,1), vec4(1,1,1,1));
-vec4 step_size;
 ivec3 vol_size;
+vec4 half_len = vec4(0,0,0,1);
 
 layout(binding = 1, std140) uniform Camera     //    16
 {
@@ -35,13 +35,21 @@ layout(binding = 1, std140) uniform Camera     //    16
     float view_plane_dist;                     //    4                  80
 } main_cam;
 
-layout(location = 0) uniform vec3 voxel_size;
+layout(location = 0) uniform float alpha_scale;
+layout(location = 1) uniform vec3 voxel_size;
+layout(location = 2) uniform int min_val;
+layout(location = 3) uniform int max_val;
+layout(location = 4) uniform int is_MIP;
+layout(location = 5) uniform int view_top;
+layout(location = 6) uniform int view_bottom;
+
 layout(binding = 0, rgba32f) uniform image2D render_texture;
-layout(binding = 1) uniform sampler3D vol_tex3D;
+layout(binding = 1) uniform usampler3D vol_tex3D;
 
 void computeRay(float pixel_x, float pixel_y, int img_width, int img_height, out Ray eye_ray);
 bool intersectRayAABB(Ray ray, AABB bb, out float t_min, out float t_max);
 vec4 rayMarchVolume(Ray eye_ray, float t_min, float t_max);
+vec4 MIP(Ray eye_ray, float t_min, float t_max);
 vec3 cartesianToTextureCoord(vec4 point);
 
 void main()
@@ -51,54 +59,59 @@ void main()
     if (pix.x >= img_size.x || pix.y >= img_size.y)
         return;
     
-    vol_size = textureSize(vol_tex3D,0);    
+    vol_size = textureSize(vol_tex3D,0);
+    
+    // Normalize Bounding box from arbitrary xyz size to 0 to aspect ratio range
+    int max_dim = max(vol_size.x, vol_size.y);
+    max_dim = max(max_dim, vol_size.z);
+    
+    if(view_bottom == 1 || view_top == 1)
+        bb.p_max = vec4(vol_size.xzy, 1.0);
+    else
+        bb.p_max = vec4(vol_size.xyz, 1.0);
+    
+    bb.p_max /= max_dim;
+    
+    if(view_bottom == 1 || view_top == 1)
+        bb.p_max *= vec4(voxel_size.xzy,1.0);
+    else
+        bb.p_max *= vec4(voxel_size.xyz,1.0);
+        
+    //Align bounding box in the center of the screen.    
+    half_len = vec4(bb.p_max.xyz/2.0, 0.0);  
+    bb.p_min -= half_len;
+    bb.p_max -= half_len;
+    
     Ray eye_ray;
-    
-    //Align bounding box in the center of the screen.
-    bb.p_max *= vec4(voxel_size,1.0);
-    x_hlen = bb.p_max.x/2.0f;
-    y_hlen = bb.p_max.y/2.0f;
-    z_hlen = bb.p_max.z/2.0f;
-	
-    bb.p_min.x -= x_hlen;
-    bb.p_max.x -= x_hlen;
-    
-    bb.p_min.y -= y_hlen;
-    bb.p_max.y -= y_hlen;
-    
-    bb.p_min.z -= z_hlen;
-    bb.p_max.z -= z_hlen;
-    
     computeRay(pix.x + 0.5, pix.y + 0.5, img_size.x, img_size.y, eye_ray);
     float t_max, t_min;
     
     if(intersectRayAABB(eye_ray, bb, t_min, t_max))
     {
-        vec4 color = rayMarchVolume(eye_ray, t_min, t_max);  
-        //color.rgb = pow(color.rgb, vec3(1.0/GAMMA));
-        //color.rgb = vec3(t_max - t_min);
+        vec4 color;
+        if(is_MIP == 1)
+            color = MIP(eye_ray, t_min, t_max);
+        else
+            color = rayMarchVolume(eye_ray, t_min, t_max);
         imageStore(render_texture, pix, color);
     }
     else
     {
-        imageStore(render_texture, pix, vec4(0.4f));
+        imageStore(render_texture, pix, vec4(0.0f));
     }
 }
 
 vec4 rayMarchVolume(Ray eye_ray, float t_min, float t_max)
 {    
-    step_size = vec4(voxel_size, 1.0)  /  vec4(vol_size,1.0);    
-	//step_size = 1 / vec4(vol_size, 1.0);	
+    float step_size;
     vec4 start_point = eye_ray.origin + (eye_ray.dir * t_min);
     vec4 end_point = eye_ray.origin + (eye_ray.dir * t_max);        
+    step_size = length(bb.p_max.xyz - bb.p_min.xyz) /  length(vol_size.xzy); 
     
     vec4 dest = vec4(0.0);
-    vec4 src = vec4(0.0);    
-    vec4 pos = start_point + eye_ray.dir * EPSILON;    
-	
-    float alpha_scale = 1;	
-    vec3 grey = vec3(0.3, 0.3, 0.3);
-	
+    vec4 src = vec4(0.0);
+    uvec4 sample_tex = uvec4(0);
+    vec4 pos = start_point + eye_ray.dir * EPSILON;  
     for(int i = 0; i < 10000; i++)
     {
         vec3 tex_coord = cartesianToTextureCoord(pos);        
@@ -106,31 +119,55 @@ vec4 rayMarchVolume(Ray eye_ray, float t_min, float t_max)
             break;
         
         src = vec4(texture(vol_tex3D, tex_coord).r);
-        if(src.a > 1/255.0)
-        {
-            src.rgb = grey;
-            src.a *= alpha_scale;            
-            src *= src.a;
-            dest += src * (1 - dest.a);
-        }        
+        src = clamp(src, vec4(min_val), vec4(max_val)); 
+        if(src.a <= max_val && src.a >= min_val)
+            src = (src - min_val) /(max_val - min_val);       
+        
+        /** We can set colors manually for a range of isovalues after visualizing the histogram like so (x and y are the control points)
+            if(src.r * 255.0 >= x && src.r *255.0 <= y)
+                src.rgb = vec3(color.x, color.y, color.z);            
+        */
+        src.a *= alpha_scale;            
+        src.rgb *= src.a;
+        dest += src * (1 - dest.a);
+        
+        if(dest.a > 0.99)
+            break;
         pos += eye_ray.dir * step_size;		
     }
+    return dest;
+}
+
+vec4 MIP(Ray eye_ray, float t_min, float t_max)
+{
+    float step_size;
+    vec4 start_point = eye_ray.origin + (eye_ray.dir * t_min);
+    vec4 end_point = eye_ray.origin + (eye_ray.dir * t_max);        
+    step_size = length(bb.p_max.xyz - bb.p_min.xyz) /  length(vol_size.xyz); 
     
+    vec4 dest = vec4(0.0);
+    vec4 src = vec4(0.0);
+    uvec4 sample_tex = uvec4(0);
+    vec4 pos = start_point + eye_ray.dir * EPSILON; 
     //MIP
-    /*for(int i = 0; i < 10000; i++)
+    for(int i = 0; i < 10000; i++)
     {
         vec3 tex_coord = cartesianToTextureCoord(pos);        
-        if(all(greaterThan(tex_coord, vec3(1.0))))
-            break;        
+        if( any(greaterThan(tex_coord, vec3(1.0))) || any(lessThan(tex_coord, vec3(0.0))) || dest.a >= 0.95)
+            break;
+        
         src = vec4(texture(vol_tex3D, tex_coord).r);
-        if(dest.r < src.r)
+        src = clamp(src, vec4(min_val), vec4(max_val)); 
+        if(src.a <= max_val && src.a >= min_val)
+            src = (src - min_val) /(max_val - min_val);  
+        
+        src *= alpha_scale;
+        if(dest.a < src.a)
         {
             dest = src;                    
         }
         pos += eye_ray.dir * step_size;
-        if(all(greaterThan(pos, end_point)))
-            break;
-    }*/
+    }
     
     return dest;
 }
@@ -138,16 +175,20 @@ vec4 rayMarchVolume(Ray eye_ray, float t_min, float t_max)
 vec3 cartesianToTextureCoord(vec4 point)
 {
     //Since the BB was aligned in the center we need to remap the coordinates back in 0-1 range
-    point.x += x_hlen;
-    point.y += y_hlen;
-    point.z += z_hlen;
+    point += half_len;
+    point /= (bb.p_max + half_len);   
     
-    /* Since (1,1,1) is actually the front side, we need to inverse it so we dont sample from the back
+    /* Since (1,1,1) is supposed to be the back of the volume but in reality it's actually the front side, (right handed coord system)
+       we need to inverse it so we dont sample from the back
      * when at the start of the bounding box
      */
-    point.z = voxel_size.z - point.z;
-	//point.z = 1 - point.z;
-    return point.xyz/voxel_size;
+    point.z = 1 - point.z; 
+    if(view_top == 1)
+        return vec3(point.x, 1 - point.z, point.y);
+    else if(view_bottom == 1)
+        return vec3(point.x, point.z, 1 - point.y);
+    else
+        return point.xyz;
 }
 
 void computeRay(float pixel_x, float pixel_y, int img_width, int img_height, out Ray eye_ray)
@@ -168,8 +209,9 @@ void computeRay(float pixel_x, float pixel_y, int img_width, int img_height, out
 	eye_ray.length = 99999999.9;*/
 	
     eye_ray.dir = normalize(vec4(x,y,z,0));
-    eye_ray.dir = normalize((main_cam.view_mat * vec4(eye_ray.dir)));
+    eye_ray.dir = normalize((main_cam.view_mat * vec4(eye_ray.dir)));    
     eye_ray.origin = main_cam.eye;
+    
     eye_ray.length = 99999999.9;
 }
 

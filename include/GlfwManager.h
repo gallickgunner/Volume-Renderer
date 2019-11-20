@@ -23,13 +23,12 @@
 #include "glad/glad.h"
 #include "GLFW/glfw3.h"
 #include "glm/vec4.hpp"
-
 #include <functional>
 
 class GlfwManager
 {
     public:
-        GlfwManager();
+        GlfwManager(int width, int height, std::string title, bool is_fullscreen = false);
         ~GlfwManager();
         void createWindow(int width, int height, std::string title, bool is_fullscreen = false);
         void focusWindow();
@@ -39,6 +38,7 @@ class GlfwManager
         int window_width, window_height, framebuffer_width, framebuffer_height;
 
     private:
+        void initImGui();
         static std::function<void(float, float, float)> cameraUpdateCallback;
 
         static void errorCallback(int error, const char* msg);

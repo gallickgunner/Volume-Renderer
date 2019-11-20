@@ -1,16 +1,15 @@
 #include <iostream>
 #include <exception>
-#include "VolumeRenderer.h"
+#include "RendererGUI.h"
 
 using namespace std;
 
 int main()
 {
-    VolumeRenderer vr;
+    RendererGUI vr(1280, 720, "Volume-Renderer");
     try
     {
-        vr.setup();
-        vr.start();
+        vr.run();
     }
     catch(exception& e)
     {

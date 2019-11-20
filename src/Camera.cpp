@@ -15,10 +15,22 @@ Camera::Camera()
 
 Camera::Camera(float y_FOV, float rot_speed, float mov_speed) : y_FOV(y_FOV), rotation_speed(rot_speed), mov_speed(mov_speed)
 {
-    view2world_mat = glm::mat4(1.0f);
-    view_plane_dist =  1/tan(y_FOV * glm::pi<float>()/360);
-    is_changed = false;
 
+    view_plane_dist =  1/tan(y_FOV * glm::pi<float>()/360);
+    is_changed = true;
+    resetCamera();
+    //ctor
+}
+
+Camera::~Camera()
+{
+
+}
+
+void Camera::resetCamera()
+{
+    view2world_mat = glm::mat4(1.0f);
+    rot_mat = glm::mat4(1.0f);
     setViewMatrix(glm::vec4(0, 0, 3, 1),
                    glm::vec4(1, 0, 0, 0),
                    glm::vec4(0, 1, 0, 0),
@@ -26,14 +38,9 @@ Camera::Camera(float y_FOV, float rot_speed, float mov_speed) : y_FOV(y_FOV), ro
                    );
     zenith = glm::pi<float>()/2.0;
     azimuth = 0;
+    tot_zenith = 0;
+    tot2_azimuth = tot_azimuth =0;
     radius = 3;
-
-    //ctor
-}
-
-Camera::~Camera()
-{
-
 }
 
 void Camera::setViewMatrix(glm::vec4 eye, glm::vec4 side, glm::vec4 up, glm::vec4 look_at)
@@ -112,12 +119,11 @@ void Camera::setOrientation(float zoom , float zenith, float azimuth)
      *  z = r * sin(zenith) * cos(azimuth)
      *  x = r * sin(zenith) * sin(azimuth)
      */
-
     eye.x = this->radius * glm::sin(this->zenith) * glm::sin(this->azimuth);
     eye.y = this->radius * glm::cos(this->zenith);
     eye.z = this->radius * glm::sin(this->zenith) * glm::cos(this->azimuth);
-
     eye.w = 1;
+
 
     look_at = glm::vec4(-eye);
     look_at.w = 0;
@@ -137,12 +143,9 @@ void Camera::setOrientation(float zoom , float zenith, float azimuth)
         side = glm::vec4(glm::cross(glm::vec3(look_at.x, look_at.y, look_at.z), glm::vec3(0,1,0)), 0);
 
     up = glm::vec4(glm::cross(glm::vec3(side.x, side.y, side.z), glm::vec3(look_at.x, look_at.y, look_at.z)), 0);
-
     side = glm::normalize(side);
     up = glm::normalize(up);
 
     view2world_mat = glm::mat4(side, up, -look_at, eye);
     is_changed = true;
 }
-
-
