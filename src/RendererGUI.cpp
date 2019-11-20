@@ -377,7 +377,7 @@ void RendererGUI::showHounsfieldScale()
     if (ImGui::Begin("Windowing Parameters", &HU_scale_shown, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav))
     {
         ImGui::SetCursorPosX(25);
-        if(ImGui::DragIntRange2("##Range", &volren.min_val, &volren.max_val, 0.5, volren.min_dataset_val, (volren.datasize_bytes == 2) ? volren.max_dataset_val - 1000 : volren.max_dataset_val, "Min: %d", "Max: %d"))
+        if(ImGui::DragIntRange2("##Range", &volren.min_val, &volren.max_val, 0.5, (volren.datasize_bytes == 2) ? volren.min_dataset_val - 1000 : volren.min_dataset_val, (volren.datasize_bytes == 2) ? volren.max_dataset_val - 1000 : volren.max_dataset_val, "Min: %d", "Max: %d"))
         {
             volren.setMinVal();
             volren.setMaxVal();
