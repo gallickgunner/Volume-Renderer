@@ -1,10 +1,10 @@
 #include <iostream>
 #include <exception>
 #include "GlfwManager.h"
-#include "imgui.h"
-#include "imgui_internal.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_internal.h"
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_opengl3.h"
 
 std::function<void(float, float, float)> GlfwManager::cameraUpdateCallback;
 

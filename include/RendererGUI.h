@@ -5,10 +5,11 @@
 
 #include "GlfwManager.h"
 #include "RendererCore.h"
+#include "UI/TransferFunction.h"
 #include "glm/vec3.hpp"
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_opengl3.h"
 #include "ImGuiFileBrowser.h"
 
 class RendererGUI
@@ -35,6 +36,7 @@ class RendererGUI
         GlfwManager glfw_manager;
         RendererCore volren;
         imgui_addons::ImGuiFileBrowser file_dialog;
+        TransferFunction transfer_func;
         std::string error_msg, error_title;
         float mspf, mspk;
         int workgroups_x, workgroups_y, profiler_wheight, tools_wheight;

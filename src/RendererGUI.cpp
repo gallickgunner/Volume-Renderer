@@ -1,6 +1,7 @@
 #include "RendererGUI.h"
 #include "glm/vec2.hpp"
 #include <functional>
+#include <iostream>
 
 RendererGUI::RendererGUI(int window_width, int window_height, std::string title, bool is_fullscreen) :
     glfw_manager(window_width, window_height, title, is_fullscreen)
@@ -44,7 +45,6 @@ void RendererGUI::run()
                                          std::placeholders::_3)
                                         );
     glfw_manager.focusWindow();
-
     int frame_count = 0;
     double prev_time = glfwGetTime(), prev_frame_time = 0, skip_ticks = 16.66666;
 
@@ -69,11 +69,12 @@ void RendererGUI::run()
         prev_frame_time = glfwGetTime();
 
         //Start Drawing a new frame
+        glClearColor(0.3, 0.3, 0.3, 1.0);
         glClear(GL_COLOR_BUFFER_BIT);
 
         startFrame();
         showMenu();
-
+        ImGui::ShowDemoWindow();
         if(histogram_shown)
             showHistogram();
 
@@ -187,7 +188,7 @@ void RendererGUI::showMenu()
     if(save_fildialog)
         ImGui::OpenPopup("Save Image");
 
-    if(file_dialog.showOpenFileDialog("Open RAW/PVM File", ImVec2(700, 310), ".raw,.pvm"))
+    if(file_dialog.showFileDialog("Open RAW/PVM File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 310), ".raw,.pvm"))
     {
         std::string ext = file_dialog.selected_fn.substr(file_dialog.selected_fn.length()-3, 3);
 
@@ -210,14 +211,14 @@ void RendererGUI::showMenu()
             enableToolsGUI();
     }
 
-    if(file_dialog.showOpenFileDialog("Open Compute Shader File", ImVec2(700, 310), ".cs"))
+    if(file_dialog.showFileDialog("Open Compute Shader File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 310), ".cs"))
     {
         volren.loadShader(file_dialog.selected_fn, false);
         if(!volren.loaded_dataset.empty())
             enableToolsGUI();
     }
 
-    if(file_dialog.showSaveFileDialog("Save Image", ImVec2(700, 310), ".png,.jpg,.bmp"))
+    if(file_dialog.showFileDialog("Save Image", imgui_addons::ImGuiFileBrowser::DialogMode::SAVE, ImVec2(700, 310), ".png,.jpg,.bmp"))
         show_error = !(volren.saveImage(file_dialog.selected_fn, file_dialog.ext));
 
     if(show_error)
@@ -315,9 +316,10 @@ void RendererGUI::showHistogram()
     ImGuiIO& io = ImGui::GetIO();
     ImGui::SetNextWindowPos(ImVec2(10,35), ImGuiCond_Once, ImVec2(0,0));
     ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x - 300, 0), ImGuiCond_Once);
-    ImGui::Begin("IsoValue Histogram##window");
-    ImGui::PlotHistogram("IsoValue Histogram", volren.histogram.data(), volren.histogram.size(), 0, NULL, 0.0f, 100.0f, ImVec2(ImGui::GetWindowSize().x -200,180));
-    ImGui::End();
+    transfer_func.render();
+    //ImGui::Begin("IsoValue Histogram##window");
+    //ImGui::PlotHistogram("IsoValue Histogram", volren.histogram.data(), volren.histogram.size(), 0, NULL, 0.0f, 100.0f, ImVec2(ImGui::GetWindowSize().x -200,180));
+    //ImGui::End();
 }
 
 void RendererGUI::showTools()
