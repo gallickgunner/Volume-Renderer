@@ -3,8 +3,8 @@ A basic Volume Renderer mainly for Medical Images like CT-Scans and MRI Images. 
 
 Some sites that provide free public volume datasets are listed below
 
-https://klacansky.com/open-scivis-datasets/  
-http://schorsch.efi.fh-nuernberg.de/data/volume/  
+http://klacansky.com/open-scivis-datasets/  
+http://volume.open-terrain.org/
 
 ## TODO:
 - Add transfer functions
